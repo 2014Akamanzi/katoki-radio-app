@@ -1,55 +1,54 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const COOKIE_NAME = "katoki_radio_access";
-
-function normalize(s: string) {
-  return (s || "").trim();
+function getAllowedCodes(): string[] {
+  const raw = process.env.KATOKI_RADIO_ACCESS_CODES || "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const input = normalize(body?.code);
+    const code = typeof body.code === "string" ? body.code.trim() : "";
 
-    // Option A (simple): one master code in env
-    const master = normalize(process.env.RADIO_ACCESS_CODE || "");
+    const allowed = getAllowedCodes();
 
-    // Option B (still simple): a small list in env (comma-separated)
-    const listRaw = process.env.RADIO_ACCESS_CODES || "";
-    const list = listRaw
-      .split(",")
-      .map((x) => normalize(x))
-      .filter(Boolean);
-
-    const ok =
-      (master && input === master) || (list.length > 0 && list.includes(input));
-
-    if (!ok) {
+    if (!code || allowed.length === 0) {
       return NextResponse.json(
-        { ok: false, error: "Invalid access code." },
+        { ok: false, message: "Access code system not configured." },
+        { status: 400 }
+      );
+    }
+
+    const isValid = allowed.includes(code);
+
+    if (!isValid) {
+      return NextResponse.json(
+        { ok: false, message: "Invalid access code." },
         { status: 401 }
       );
     }
 
     const res = NextResponse.json({ ok: true });
 
-    // Cookie valid for 30 days
-    res.cookies.set({
-      name: COOKIE_NAME,
-      value: "1",
+    // 7 days cookie
+    res.cookies.set("katoki_radio_access", "ok", {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return res;
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Server error." },
+      { ok: false, message: "Server error." },
       { status: 500 }
     );
   }

@@ -1,35 +1,32 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const COOKIE_NAME = "katoki_radio_access";
-
-// Only allow public paths without a code:
-function isPublicPath(pathname: string) {
-  if (pathname === "/access") return true;
-  if (pathname.startsWith("/api/access")) return true;
-
-  // Next internals + static assets
-  if (pathname.startsWith("/_next")) return true;
-  if (pathname === "/favicon.ico") return true;
-
-  // allow public assets from /public (images, etc.)
-  if (pathname.startsWith("/")) {
-    const isAsset =
-      pathname.match(/\.(png|jpg|jpeg|webp|svg|ico|css|js|map)$/i) !== null;
-    if (isAsset) return true;
-  }
-
-  return false;
-}
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (isPublicPath(pathname)) return NextResponse.next();
+  // Allow Next internals + static files
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon.ico") ||
+    pathname.startsWith("/robots.txt") ||
+    pathname.startsWith("/sitemap.xml") ||
+    pathname.startsWith("/icons") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/public")
+  ) {
+    return NextResponse.next();
+  }
 
-  const hasAccess = req.cookies.get(COOKIE_NAME)?.value === "1";
+  // Allow access + API route needed to validate
+  if (pathname === "/access" || pathname.startsWith("/api/access")) {
+    return NextResponse.next();
+  }
+
+  // Already authorised?
+  const hasAccess = req.cookies.get("katoki_radio_access")?.value === "ok";
   if (hasAccess) return NextResponse.next();
 
+  // Otherwise redirect to /access
   const url = req.nextUrl.clone();
   url.pathname = "/access";
   return NextResponse.redirect(url);
