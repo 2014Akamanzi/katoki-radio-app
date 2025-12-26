@@ -34,7 +34,6 @@ export default function AccessClient() {
         return;
       }
 
-      // success: cookie should be set by the API; go home
       window.location.href = "/";
     } catch {
       setErr("Network error. Please try again.");
@@ -43,8 +42,6 @@ export default function AccessClient() {
     }
   }
 
-  // if someone already has access cookie, middleware should allow /,
-  // but this helps if they land here manually.
   useEffect(() => {
     setErr(null);
   }, []);
