@@ -6,69 +6,78 @@ import { useRouter } from "next/navigation";
 export default function AccessClient() {
   const router = useRouter();
 
-  const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const hint = useMemo(() => {
-    return "Enter your access code to continue.";
+  const allowed = useMemo(() => {
+    // Keep your existing env name exactly:
+    const raw = process.env.NEXT_PUBLIC_KATOKI_RADIO_ACCESS_CODES ?? "";
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }, []);
 
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
   async function submit() {
-    setError("");
-    const trimmed = code.trim();
-
-    if (!trimmed) {
-      setError("Please enter an access code.");
-      return;
-    }
-
+    setError(null);
     setLoading(true);
+
     try {
       const res = await fetch("/api/access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmed }),
+        body: JSON.stringify({ code }),
       });
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error || "Invalid access code.");
+        setError("Invalid access code.");
+        setLoading(false);
         return;
       }
 
-      // success: middleware cookie should now allow entry
-      router.push("/");
-      router.refresh();
+      // Server sets cookie; now go home (radio player page)
+      router.replace("/");
     } catch {
-      setError("Network error. Please try again.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-12">
-      <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-slate-900">Katoki Radio Access</h1>
-          <p className="text-sm text-slate-600">{hint}</p>
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-blue-700"
+          >
+            ← Back to home
+          </a>
+          <span className="text-xs text-slate-500">Katoki Radio</span>
         </div>
 
+        <h1 className="text-2xl font-bold text-slate-900">Access code</h1>
+        <p className="mt-2 text-slate-600">
+          Enter your access code to listen to Katoki Radio.
+        </p>
+
         <div className="mt-6 space-y-3">
-          <label className="block text-sm font-semibold text-slate-700">
-            Access code
-          </label>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
             placeholder="e.g., RADIO2024"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:ring-2 focus:ring-blue-200"
-            autoFocus
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-blue-500"
           />
+
+          <button
+            onClick={submit}
+            disabled={loading}
+            className="w-full rounded-2xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {loading ? "Checking..." : "Continue"}
+          </button>
 
           {error ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -76,18 +85,15 @@ export default function AccessClient() {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={submit}
-            disabled={loading}
-            className="inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
-          >
-            {loading ? "Checking..." : "Continue"}
-          </button>
-
-          <p className="pt-2 text-xs text-slate-500">
-            Need an access code? Email: <span className="font-semibold">info.radio@katokifoundation.org</span>
-          </p>
+          {allowed.length === 0 ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Note: No codes found in{" "}
+              <span className="font-mono">
+                NEXT_PUBLIC_KATOKI_RADIO_ACCESS_CODES
+              </span>
+              .
+            </div>
+          ) : null}
         </div>
       </div>
     </main>
